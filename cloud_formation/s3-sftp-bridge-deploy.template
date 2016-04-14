@@ -1,0 +1,157 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "BucketName": {
+      "Type": "String",
+      "Description": "The S3 bucket where you will sync to and from SFTP. This must not already exist."
+    }
+  },
+  "Resources": {
+    "S3SftpBridgeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [ "lambda.amazonaws.com" ]
+              },
+              "Action": [ "sts:AssumeRole" ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "LogWriter",
+            "PolicyDocument": {
+              "Version" : "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "arn:aws:logs:*:*:*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "ConfigReader",
+            "PolicyDocument": {
+              "Version" : "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": { "Fn::Join":  [ "", [ "arn:aws:s3:::aws.lambda.", { "Ref": "AWS::Region" }, ".", { "Ref": "AWS::AccountId" } , ".config/*" ] ] }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "FileSyncher",
+            "PolicyDocument": {
+              "Version" : "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:CopyObject",
+                    "s3:GetObject",
+                    "s3:ListObjects",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    { "Fn::Join":  [ "", [ "arn:aws:s3:::", { "Ref": "BucketName" } ] ] },
+                    { "Fn::Join":  [ "", [ "arn:aws:s3:::", { "Ref": "BucketName" } , "/*" ] ] }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SftpToS3Function": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "com.gilt.public.backoffice",
+          "S3Key": "lambda_functions/s3-sftp-bridge.zip"
+        },
+        "Description": "Used sync files between SFTP servers and S3.",
+        "Handler": "main.pollSftp",
+        "Role": { "Fn::GetAtt" : [ "S3SftpBridgeRole", "Arn" ] },
+        "Runtime": "nodejs",
+        "Timeout": 300
+      },
+      "DependsOn": [
+        "S3SftpBridgeRole"
+      ]
+    },
+    "S3ToSftpFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": "com.gilt.public.backoffice",
+          "S3Key": "lambda_functions/s3-sftp-bridge.zip"
+        },
+        "Description": "Used sync files between S3 and SFTP servers.",
+        "Handler": "main.newS3Object",
+        "Role": { "Fn::GetAtt" : [ "S3SftpBridgeRole", "Arn" ] },
+        "Runtime": "nodejs",
+        "Timeout": 300
+      },
+      "DependsOn": [
+        "S3SftpBridgeRole"
+      ]
+    },
+    "S3SftpBridgeResourcePolicy": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": { "Fn::GetAtt": [ "S3ToSftpFunction", "Arn" ] },
+        "Principal": "s3.amazonaws.com",
+        "SourceAccount": { "Ref": "AWS::AccountId" },
+        "SourceArn": { "Fn::Join" : ["", [ "arn:aws:s3:::", { "Ref" : "BucketName" } ] ] }
+      },
+      "DependsOn": [
+        "S3ToSftpFunction"
+      ]
+    },
+    "S3SftpBridgeBucket": {
+      "Type" : "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Ref": "BucketName" },
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Function": { "Fn::GetAtt": [ "S3ToSftpFunction", "Arn" ] }
+            }
+          ]
+        }
+      },
+      "DependsOn": [
+        "S3SftpBridgeResourcePolicy"
+      ]
+    }
+  },
+  "Outputs": {
+    "S3ToSftpFunctionArn": {
+      "Description": "The ARN of the function that moves files from S3 to SFTP.",
+      "Value": { "Fn::GetAtt": [ "S3ToSftpFunction", "Arn" ] }
+    },
+    "SftpToS3FunctionArn": {
+      "Description": "The ARN of the function that moves files from SFTP to S3.",
+      "Value": { "Fn::GetAtt": [ "SftpToS3Function", "Arn" ] }
+    }
+  }
+}
