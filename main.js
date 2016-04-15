@@ -5,6 +5,14 @@ var AWS = require('aws-sdk'),
     awsS3 = Promise.promisifyAll(new AWS.S3()),
     sftpHelper = require('./lib/sftpHelper');
 
+exports.handle = function(event, context) {
+  if (event.Records) {
+    return exports.newS3Object(event, context);
+  } else {
+    return exports.pollSftp(event, context);
+  }
+}
+
 exports.pollSftp = function(event, context) {
   return Promise.try(function() {
     if (!event.streamName) throw new Error("streamName required for config discovery")

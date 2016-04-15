@@ -31,6 +31,47 @@ describe('main', function() {
     testHelper.sftp.clear();
   });
 
+  describe('#handle()', function() {
+    it('should direct to pollSftp when applicable', function() {
+      testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket"}}';
+      testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World!';
+      return testHelper.assertContextSuccess(
+        main.handle({streamName: "test-stream"}, ctx),
+        ctx,
+        function(results) {
+          assert.equal(testHelper.s3.objects['my-bucket/my-file.txt'], 'Hello World!');
+        }
+      );
+    });
+
+    it('should direct to newS3Object when applicable', function() {
+      var s3Event = {  
+        "Records": [  
+          {
+            "s3": {
+              "bucket": {
+                "name": "bucket-name",
+              },
+              "object": {
+                "key": "object-key",
+              }
+            }
+          }
+        ]
+      }
+      testHelper.s3.objects["bucket-name/object-key"] = "Hello World!"
+      testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"s3Location":"bucket-name","sftpConfig":{}}}';
+      return testHelper.assertContextSuccess(
+        main.newS3Object(s3Event, ctx),
+        ctx,
+        function() {
+          assert.equal(testHelper.sftp.objects["object-key"], "Hello World!");
+          assert.equal(Object.keys(testHelper.sftp.objects).length, 1);
+        }
+      );
+    });
+  });
+
   describe('#pollSftp()', function() {
     it('should fail if the streamName is missing', function() {
       return testHelper.assertContextFailure(
