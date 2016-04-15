@@ -131,6 +131,10 @@
     "BridgeFunctionArn": {
       "Description": "The ARN of the function that moves files between S3 and SFTP.",
       "Value": { "Fn::GetAtt": [ "BridgeFunction", "Arn" ] }
+    },
+    "BridgeFunctionRole": {
+      "Description": "The role used by the generated Lambda function, to be added to any KMS keys.",
+      "Value": { "Ref": "BridgeRole" }
     }
   }
 }

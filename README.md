@@ -80,6 +80,10 @@ are no guarantees. To explicitly assign an outgoing IP address, do the following
 If you do #1-4 ahead of time, you can use the [s3-sftp-bridge-deploy-to-vpc.template](cloud_formation/s3-sftp-bridge-deploy-to-vpc.template)
 to automatically add the Bridge function to the VPC (#5 above).
 
+### KMS / Security
+If you're client-side encrypting either the Bridge config or any private keys (see https://github.com/gilt/node-s3-encryption-client),
+the Bridge Lambda function will need access to any applicable KMS keys. You can find the Role name in the CF stack outputs. 
+
 ### Triggering the sync
 Two events are necessary to trigger this bridge to sync between the two systems, as detailed below.
 
