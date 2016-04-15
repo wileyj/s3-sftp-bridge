@@ -14,9 +14,9 @@ be ignored.
 For more details, see the sections below. But here is the recommended list of steps to deploy thie bridge.
 
 1. Create a CloudFormation Stack using one of the [templates](cloud_formation/s3-sftp-bridge-deploy-to-vpc.template).
-2. Add the stack's output role to the [KMS key's](#kms-security) list of "Key Users".
+2. Add the stack's output role to the [KMS key's](#kms--security) list of "Key Users".
 3. Add a [config file](#configuration) named after the stack's output function name.
-4. Manually setup the [SFTP polling schedule](#sftp-s3).
+4. Manually setup the [SFTP polling schedule](#sftp--s3).
 
 
 ## Configuration
