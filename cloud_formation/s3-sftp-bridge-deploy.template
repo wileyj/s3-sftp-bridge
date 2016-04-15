@@ -89,7 +89,7 @@
         "Description": "Used sync files between S3 and SFTP servers.",
         "Handler": "main.handle",
         "Role": { "Fn::GetAtt" : [ "BridgeRole", "Arn" ] },
-        "Runtime": "nodejs",
+        "Runtime": "nodejs4.3",
         "Timeout": 300
       },
       "DependsOn": [
