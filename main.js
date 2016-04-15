@@ -40,6 +40,10 @@ exports.pollSftp = function(event, context) {
             if (!s3Location) throw new Error("streamName [" + streamName + "] has no s3Location");
             return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
               return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
+            })
+            .then(function(results) {
+              console.info("[" + streamName + "]: Moved " + results.length + " files from SFTP to S3");
+              return results;
             });
           });
         }
@@ -47,7 +51,7 @@ exports.pollSftp = function(event, context) {
     });
   })
   .then(function(result) {
-    context.succeed(result);
+    context.succeed(flatten(result));
   })
   .catch(function(err) {
     console.error(err.stack || err);
@@ -97,12 +101,14 @@ exports.newS3Object = function(event, context) {
                       )
                       .then(function() {
                         console.info("...done");
+                        console.info("[" + configKey + "]: Moved 1 files from S3 to SFTP");
+                        return sftpFileName;
                       });
                     });
                   });
                 }
               )
-              .then(function() {
+              .then(function(sftpFiles) {
                 var metadata = objectData.Metadata || {};
                 metadata["synched"] = "true";
                 return awsS3.copyObjectAsync({
@@ -120,7 +126,7 @@ exports.newS3Object = function(event, context) {
     });
   })
   .then(function(result) {
-    context.succeed(result);
+    context.succeed(flatten(result));
   })
   .catch(function(err) {
     console.error(err.stack || err);
@@ -195,4 +201,17 @@ exports.syncSftpDir = function(sftp, sftpDir, s3Location, topDir) {
       }
     );
   })
+}
+
+function flatten(arr) {
+  return arr.reduce(function(a, b) {
+    if (Array.isArray(b)) {
+      return a.concat(flatten(b));
+    } else if (b) {
+      a.push(b);
+      return a;
+    } else {
+      return a;
+    }
+  }, []);
 }

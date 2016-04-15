@@ -110,6 +110,16 @@ in your config file. There can be multiple streamNames in the same event, and mu
 The Lambda scheduled event system allows you to schedule the event at whatever interval is appropriate for your setup.
 See http://docs.aws.amazon.com/lambda/latest/dg/with-scheduled-events.html for details.
 
+### Alerting
+You should set up some alerting through CloudWatch Logs to make sure the bridge is behaving as expected. The Bridge function
+writes some useful data to the logs, which will allow you to alert differently for each individual stream. These log entries
+in particular will be useful:
+
+```
+[stream-name]: Moved 1 files from S3 to SFTP
+[stream-name]: Moved 1 files from SFTP to S3
+```
+
 
 ## Deployment (contributors)
 After making changes, please do the following:
