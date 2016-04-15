@@ -15,19 +15,35 @@ exports.handle = function(event, context) {
 
 exports.pollSftp = function(event, context) {
   return Promise.try(function() {
-    if (!event.streamName) throw new Error("streamName required for config discovery")
+    var streamNames = [];
+    if (event.resources) {
+      if (Array.isArray(event.resources)) {
+        event.resources.forEach(function(resource) {
+          streamNames = streamNames.concat(exports.scheduledEventResourceToStreamNames(resource));
+        });
+      } else {
+        streamNames = exports.scheduledEventResourceToStreamNames(event.resources);
+      }
+    }
+    if (streamNames.length == 0) throw new Error("streamNames required for config discovery")
     return conf.getConfigAsync(context)
     .then(function(config) {
-      var streamConfig = config[event.streamName];
-      if (!streamConfig) throw new Error("streamName [" + event.streamName + "] not found in config");
-      return exports.getSftpConfig(streamConfig)
-      .then(function(sftpConfig) {
-        var s3Location = streamConfig.s3Location;
-        if (!s3Location) throw new Error("streamName [" + event.streamName + "] has no s3Location");
-        return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
-          return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
-        });
-      });
+      return Promise.map(
+        streamNames,
+        function(streamName) {
+          streamName = streamName.trim();
+          var streamConfig = config[streamName];
+          if (!streamConfig) throw new Error("streamName [" + streamName + "] not found in config");
+          return exports.getSftpConfig(streamConfig)
+          .then(function(sftpConfig) {
+            var s3Location = streamConfig.s3Location;
+            if (!s3Location) throw new Error("streamName [" + streamName + "] has no s3Location");
+            return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
+              return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
+            });
+          });
+        }
+      );
     });
   })
   .then(function(result) {
@@ -133,6 +149,10 @@ exports.getSftpConfig = function(config) {
       });
     } else return config.sftpConfig;
   })
+}
+
+exports.scheduledEventResourceToStreamNames = function(resource) {
+  return resource.substr(resource.toLowerCase().indexOf("rule/") + 5).split(".");
 }
 
 exports.syncSftpDir = function(sftp, sftpDir, s3Location, topDir) {

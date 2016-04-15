@@ -9,6 +9,16 @@ This prevents us from copying the same files over and over again. It also allows
 the file back into the original directory); the consequence is that files in the '.done' subdirectory will
 be ignored.
 
+
+## Quick Deploy
+For more details, see the sections below. But here is the recommended list of steps to deploy thie bridge.
+
+1. Create a CloudFormation Stack using one of the [templates](cloud_formation/s3-sftp-bridge-deploy-to-vpc.template).
+2. Add the stack's output role to the [KMS key's](#kms-security) list of "Key Users".
+3. Add a [config file](#configuration) named after the stack's output function name.
+4. Manually setup the [SFTP polling schedule](#sftp-s3).
+
+
 ## Configuration
 Config should be stored in a .json file in S3 according to https://github.com/gilt/aws-lambda-config#motivation.
 The configuration is a map of streamName to configuration for that stream:
@@ -93,14 +103,9 @@ all requisite permissions. The included CloudFormation template will set up a fr
 property. But any additional S3 buckets + notifications will need to be setup manually.
 
 #### SFTP => S3
-The included Lambda function will need to poll the SFTP server using a scheduled event in AWS Lambda. The scheduled
-event should include a single property, "streamName", set to the corresponding stream in config:
-
-```
-{
-  "streamName": "foo"
-}
-```
+The included Lambda function will need to poll the SFTP server using a scheduled event in AWS Lambda. When scheduling the
+event (via CloudWatch Events), include in the "name" field a period-delimited (".") list of streamNames that match streamNames
+in your config file. There can be multiple streamNames in the same event, and multiple events polling the Bridge function.
 
 The Lambda scheduled event system allows you to schedule the event at whatever interval is appropriate for your setup.
 See http://docs.aws.amazon.com/lambda/latest/dg/with-scheduled-events.html for details.

@@ -36,7 +36,7 @@ describe('main', function() {
       testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket"}}';
       testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World!';
       return testHelper.assertContextSuccess(
-        main.handle({streamName: "test-stream"}, ctx),
+        main.handle({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream"]}, ctx),
         ctx,
         function(results) {
           assert.equal(testHelper.s3.objects['my-bucket/my-file.txt'], 'Hello World!');
@@ -73,18 +73,18 @@ describe('main', function() {
   });
 
   describe('#pollSftp()', function() {
-    it('should fail if the streamName is missing', function() {
+    it('should fail if the streamNames are missing', function() {
       return testHelper.assertContextFailure(
         main.pollSftp({}, ctx),
         ctx,
-        /streamName required/
+        /streamNames required/
       );
     });
 
     it('should fail if streamName has no config', function() {
       testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{}';
       return testHelper.assertContextFailure(
-        main.pollSftp({streamName: "test-stream"}, ctx),
+        main.pollSftp({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream"]}, ctx),
         ctx,
         /streamName \[test-stream\] not found in config/
       );
@@ -93,7 +93,7 @@ describe('main', function() {
     it('should fail if streamName has no s3Location', function() {
       testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"sftpConfig":{}}}';
       return testHelper.assertContextFailure(
-        main.pollSftp({streamName: "test-stream"}, ctx),
+        main.pollSftp({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream"]}, ctx),
         ctx,
         /streamName \[test-stream\] has no s3Location/
       );
@@ -103,10 +103,51 @@ describe('main', function() {
       testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket"}}';
       testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World!';
       return testHelper.assertContextSuccess(
-        main.pollSftp({streamName: "test-stream"}, ctx),
+        main.pollSftp({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream"]}, ctx),
         ctx,
         function(results) {
           assert.equal(testHelper.s3.objects['my-bucket/my-file.txt'], 'Hello World!');
+        }
+      );
+    });
+
+
+    it('should copy a file if the resources property is a string instead of an array', function() {
+      testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket"}}';
+      testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World!';
+      return testHelper.assertContextSuccess(
+        main.pollSftp({resources: "arn:aws:events:us-east-1:1234567890:rule/test-stream"}, ctx),
+        ctx,
+        function(results) {
+          assert.equal(testHelper.s3.objects['my-bucket/my-file.txt'], 'Hello World!');
+        }
+      );
+    });
+
+    it('should copy multiple files in the same resource', function() {
+      testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream1":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket1"},"test-stream2":{"dir":"foo","sftpConfig":{},"s3Location":"my-bucket2"}}';
+      testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World 1!';
+      testHelper.sftp.objects['foo/my-file.txt'] = 'Hello World 2!';
+      return testHelper.assertContextSuccess(
+        main.pollSftp({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream1.test-stream2"]}, ctx),
+        ctx,
+        function(results) {
+          assert.equal(testHelper.s3.objects['my-bucket1/my-file.txt'], 'Hello World 1!');
+          assert.equal(testHelper.s3.objects['my-bucket2/my-file.txt'], 'Hello World 2!');
+        }
+      );
+    });
+
+    it('should copy multiple files in different resources', function() {
+      testHelper.s3.objects["aws.lambda.us-east-1.1234567890.config/test.json"] = '{"test-stream1":{"dir":"dir","sftpConfig":{},"s3Location":"my-bucket1"},"test-stream2":{"dir":"foo","sftpConfig":{},"s3Location":"my-bucket2"}}';
+      testHelper.sftp.objects['dir/my-file.txt'] = 'Hello World 1!';
+      testHelper.sftp.objects['foo/my-file.txt'] = 'Hello World 2!';
+      return testHelper.assertContextSuccess(
+        main.pollSftp({resources: ["arn:aws:events:us-east-1:1234567890:rule/test-stream1", "arn:aws:events:us-east-1:1234567890:rule/test-stream2"]}, ctx),
+        ctx,
+        function(results) {
+          assert.equal(testHelper.s3.objects['my-bucket1/my-file.txt'], 'Hello World 1!');
+          assert.equal(testHelper.s3.objects['my-bucket2/my-file.txt'], 'Hello World 2!');
         }
       );
     });
@@ -272,6 +313,16 @@ describe('main', function() {
           assert.deepEqual(config, {hostname: 'foo', privateKey: 'my-key'});
         }
       );
+    });
+  });
+
+  describe('#scheduledEventResourceToStreamNames()', function() {
+    it('should remove the rule/', function() {
+      assert.deepEqual(main.scheduledEventResourceToStreamNames("arn:aws:events:us-east-1:1234567890:rule/test"), ["test"]);
+    });
+
+    it('should split on "."', function() {
+      assert.deepEqual(main.scheduledEventResourceToStreamNames("arn:aws:events:us-east-1:1234567890:rule/test1.test2.test3"), ["test1", "test2", "test3"]);
     });
   });
 
