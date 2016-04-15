@@ -53,10 +53,32 @@ contains the SSH private key to use in the connection. If used, this should be e
 to https://github.com/gilt/node-s3-encryption-client.
 
 
-## Outside configuration
+## Configuration outside the CloudFormation template
+There are a few things that you will need to (optionally) configure outside of what the provided CloudFormation
+template sets up for you. These are explicitly excluded from the CF template because they are very dependent on
+your own specific requirements and would be difficult to generalize into the template.
 
 ### Networking
-TODO: Explain here
+If you lock down your SFTP server (and you should) by whitelisting client IP addresses, you will need to take a few
+extra steps to ensure a consistent outgoing IP address. If you run the Bridge Lambda function outside of a VPC, you
+will get a random outgoing IP address assigned by AWS. It may look like they use the same one every time, but there
+are no guarantees. To explicitly assign an outgoing IP address, do the following:
+
+1. Create a publicly-facing VPC.
+2. Create subnets inside that VPC.
+3. Route those subnets through a NAT.
+  a. Assign an IP address to the NAT. This will be your outgoing IP address, for use in whitelisting.
+  b. Open the SFTP port (22 by default) for both incoming and outgoing on the NAT device.
+  c. Consider locking 3b to the specific IP address of your destination SFTP server.
+4. Create a security group for this.
+5. Edit the Bridge Lambda function's configuration to
+  a. Use the VPC from 1.
+  b. Use the subnets from 2.
+  c. Use the security group from 4.
+6. Whitelist the IP address from 3a on your SFTP server.
+
+If you do #1-4 ahead of time, you can use the [s3-sftp-bridge-deploy-to-vpc.template](cloud_formation/s3-sftp-bridge-deploy-to-vpc.template)
+to automatically add the Bridge function to the VPC (#5 above).
 
 ### Triggering the sync
 Two events are necessary to trigger this bridge to sync between the two systems, as detailed below.
@@ -94,7 +116,7 @@ After making changes, please do the following:
    Unfortunately we can't use the Github .zip file directly, because it zips the code into a subdirectory named after
    the repo; AWS Lambda then can't find the .js file containing the helper functions because it is not on the top-level.
 
-2. Upload the edited s3-sftp-bridge-deploy.template to com.gilt.public.backoffice/cloudformation_templates
+2. Upload the edited templates from the cloud_formation directort to com.gilt.public.backoffice/cloudformation_templates.
 
 
 ## License
