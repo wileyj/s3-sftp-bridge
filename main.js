@@ -42,7 +42,7 @@ exports.pollSftp = function(event, context) {
               return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
             })
             .then(function(results) {
-              console.info("[" + streamName + "]: Moved " + results.length + " files from SFTP to S3");
+              console.info("[" + streamName + "]: Moved " + flatten(results).length + " files from SFTP to S3");
               return results;
             });
           });
