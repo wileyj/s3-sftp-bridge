@@ -120,6 +120,22 @@ in particular will be useful:
 [stream-name]: Moved 1 files from SFTP to S3
 ```
 
+You can set up a CloudWatch Logs metric filter for
+
+```
+[timestamp, requestId, streamName, colon, moved = Moved, numFiles, files = files, from, orig = SFTP, to, dest = S3]
+```
+
+and
+
+```
+[timestamp, requestId, streamName, colon, moved = Moved, numFiles, files = files, from, orig = S3, to, dest = SFTP]
+```
+
+Use $numFiles as the metric value, then alert on both the count (to ensure the bridge is running) and sum (to ensure
+the bridge is moving files at the rate you expect). You can alert on individual streams by editing the filter above
+to only match when streamName matches your stream name.
+
 
 ## Deployment (contributors)
 After making changes, please do the following:
