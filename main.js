@@ -38,6 +38,7 @@ exports.pollSftp = function(event, context) {
           .then(function(sftpConfig) {
             var s3Location = streamConfig.s3Location;
             if (!s3Location) throw new Error("streamName [" + streamName + "] has no s3Location");
+            console.info("Attempting connection for [" + streamName + "]: host[" + sftpConfig.host + "], username[" + sftpConfig.username + "]");
             return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
               return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
             })
