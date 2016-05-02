@@ -40,7 +40,7 @@ exports.pollSftp = function(event, context) {
             if (!s3Location) throw new Error("streamName [" + streamName + "] has no s3Location");
             console.info("Attempting connection for [" + streamName + "]: host[" + sftpConfig.host + "], username[" + sftpConfig.username + "]");
             return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
-              return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location);
+              return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location, streamConfig.fileRetentionDays);
             })
             .then(function(results) {
               console.info("[" + streamName + "]: Moved " + flatten(results).length + " files from SFTP to S3");
@@ -162,18 +162,25 @@ exports.scheduledEventResourceToStreamNames = function(resource) {
   return resource.substr(resource.toLowerCase().indexOf("rule/") + 5).split(".");
 }
 
-exports.syncSftpDir = function(sftp, sftpDir, s3Location, topDir) {
+exports.syncSftpDir = function(sftp, sftpDir, s3Location, fileRetentionDays, topDir, isInDoneDir) {
   topDir = topDir || sftpDir;
+  fileRetentionDays = fileRetentionDays || 14; // Default to retaining files for 14 days.
   return sftp.readdirAsync(sftpDir)
   .then(function(dirList) {
     return Promise.map(
       dirList,
       function(fileInfo) {
         return Promise.try(function() {
-          if (fileInfo.filename == sftpHelper.DoneDir) {
-            return null;
-          } else if (fileInfo.longname[0] == 'd') {
-            return exports.syncSftpDir(sftp, sftpDir + '/' + fileInfo.filename, s3Location, topDir);
+          if (fileInfo.longname[0] == 'd') {
+            return exports.syncSftpDir(sftp, sftpDir + '/' + fileInfo.filename, s3Location, fileRetentionDays, topDir, isInDoneDir || fileInfo.filename == sftpHelper.DoneDir);
+          } else if (isInDoneDir) {
+            // Purge files from the .done folder based on the stream config
+            var fileDate = new Date(fileInfo.attrs.mtime * 1000),
+                purgeDate = new Date();
+            purgeDate.setDate(purgeDate.getDate() - fileRetentionDays);
+            if (fileDate < purgeDate) {
+              return sftp.unlinkAsync(sftpDir + '/' + fileInfo.filename);
+            }
           } else {
             return sftpHelper.processFile(sftp, sftpDir, fileInfo.filename, function(body) {
               var s3Path = exports.getFilePathArray(s3Location),

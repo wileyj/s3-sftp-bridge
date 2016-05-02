@@ -416,5 +416,45 @@ describe('main', function() {
         }
       );
     });
+
+    it('should purge old files from the .done directory with a default retention', function() {
+      testHelper.sftp.objects['dir/.done/my-file1.txt'] = 'Hello World! 1';
+      testHelper.sftp.objects['dir/.done/my-file2.txt'] = 'Hello World! 2';
+      testHelper.sftp.setTime('dir/.done/my-file2.txt', 15);
+      testHelper.sftp.objects['dir/sub-dir/.done/my-file3.txt'] = 'Hello World! 3';
+      testHelper.sftp.objects['dir/sub-dir/.done/my-file4.txt'] = 'Hello World! 4';
+      testHelper.sftp.setTime('dir/sub-dir/.done/my-file4.txt', 15);
+      return testHelper.assertSuccess(
+        main.syncSftpDir(sftp, 'dir', 'my-bucket/other/sub/dir'),
+        function() {
+          assert.equal(testHelper.sftp.objects['dir/.done/my-file1.txt'], 'Hello World! 1');
+          assert.equal(testHelper.sftp.objects['dir/.done/my-file2.txt'], null);
+          assert.equal(testHelper.sftp.objects['dir/sub-dir/.done/my-file3.txt'], 'Hello World! 3');
+          assert.equal(testHelper.sftp.objects['dir/sub-dir/.done/my-file4.txt'], null);
+          assert.equal(Object.keys(testHelper.sftp.objects).length, 2);
+        }
+      );
+    });
+
+    it('should purge old files from the .done directory with a configured retention', function() {
+      testHelper.sftp.objects['dir/.done/my-file1.txt'] = 'Hello World! 1';
+      testHelper.sftp.setTime('dir/.done/my-file1.txt', 19);
+      testHelper.sftp.objects['dir/.done/my-file2.txt'] = 'Hello World! 2';
+      testHelper.sftp.setTime('dir/.done/my-file2.txt', 21);
+      testHelper.sftp.objects['dir/sub-dir/.done/my-file3.txt'] = 'Hello World! 3';
+      testHelper.sftp.setTime('dir/sub-dir/.done/my-file3.txt', 18);
+      testHelper.sftp.objects['dir/sub-dir/.done/my-file4.txt'] = 'Hello World! 4';
+      testHelper.sftp.setTime('dir/sub-dir/.done/my-file4.txt', 22);
+      return testHelper.assertSuccess(
+        main.syncSftpDir(sftp, 'dir', 'my-bucket/other/sub/dir', 20),
+        function() {
+          assert.equal(testHelper.sftp.objects['dir/.done/my-file1.txt'], 'Hello World! 1');
+          assert.equal(testHelper.sftp.objects['dir/.done/my-file2.txt'], null);
+          assert.equal(testHelper.sftp.objects['dir/sub-dir/.done/my-file3.txt'], 'Hello World! 3');
+          assert.equal(testHelper.sftp.objects['dir/sub-dir/.done/my-file4.txt'], null);
+          assert.equal(Object.keys(testHelper.sftp.objects).length, 2);
+        }
+      );
+    });
   });
 });

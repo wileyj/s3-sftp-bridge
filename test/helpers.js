@@ -110,8 +110,15 @@ exports.s3 = {
 }
 exports.sftp = {
   'objects': {},
+  'object_times': {},
   'clear': function() {
     this.objects = {};
+    this.object_times = {};
+  },
+  'setTime': function(path, daysBeforeNow) {
+    var date = new Date();
+    date.setDate(date.getDate() - daysBeforeNow);
+    this.object_times[path] = dateToMtime(date);
   },
   'close': function(handle, callback) {
     callback(null);
@@ -120,6 +127,13 @@ exports.sftp = {
   'mkdir': function(path, callback) {
     if (!this.objects[path]) {
       this.objects[path] = null;
+    }
+    callback(null);
+    return true;
+  },
+  'unlink': function(path, callback) {
+    if (this.objects[path]) {
+      delete this.objects[path];
     }
     callback(null);
     return true;
@@ -142,7 +156,9 @@ exports.sftp = {
   'readdir': function(location, callback) {
     var matching = Object.keys(this.objects).filter(function(key) { return key.startsWith(location + '/') });
     var objects = this.objects;
-    callback(null, matching.map(function(key) {
+    var object_times = this.object_times;
+    var dirList = {};
+    matching.forEach(function(key) {
       var object = objects[key],
           path = key.split('/'),
           locationPath = location.split('/');
@@ -150,14 +166,16 @@ exports.sftp = {
       var isDir = (object == null) || path.length > 1,
           filename = path[0],
           fileSize = isDir ? 4096 : object.length;
-      return {
+      dirList[filename] = {
         filename: filename,
         longname: (isDir ? 'd' : '-') + '-rw-r--r--   1 root root   ' + fileSize + ' Oct 07  2014 ' + filename,
         attrs: {
-          size: fileSize
+          size: fileSize,
+          mtime: object_times[key] || dateToMtime(new Date())
         }
       }
-    }));
+    });
+    callback(null, Object.keys(dirList).map(function(key) { return dirList[key]; }));
     return true;
   },
   'rename': function(srcPath, destPath, callback) {
@@ -170,9 +188,14 @@ exports.sftp = {
   },
   'write': function(handle, buffer, offset, length, position, callback) {
     this.objects[handle.toString()] = buffer.toString();
+    this.object_times[handle.toString()] = dateToMtime(new Date());
     callback(null);
     return true;
   }
+}
+
+function dateToMtime(date) {
+  return Math.round(date.valueOf() / 1000);
 }
 
 if (!String.prototype.startsWith) {
