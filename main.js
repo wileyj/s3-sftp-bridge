@@ -40,7 +40,7 @@ exports.pollSftp = function(event, context) {
             if (!s3Location) throw new Error("streamName [" + streamName + "] has no s3Location");
             console.info("Attempting connection for [" + streamName + "]: host[" + sftpConfig.host + "], username[" + sftpConfig.username + "]");
             return sftpHelper.withSftpClient(sftpConfig, function(sftp) {
-              return exports.syncSftpDir(sftp, streamConfig.dir || '/', s3Location, streamConfig.fileRetentionDays);
+              return exports.syncSftpDir(sftp, streamConfig.sftpLocation || '/', s3Location, streamConfig.fileRetentionDays);
             })
             .then(function(results) {
               console.info("[" + streamName + "]: Moved " + flatten(results).length + " files from SFTP to S3");
@@ -89,7 +89,7 @@ exports.newS3Object = function(event, context) {
                 function(configKey) {
                   var streamConfig = config[configKey];
                   var configS3Path = exports.getFilePathArray(streamConfig.s3Location);
-                  var sftpDirPath = exports.getFilePathArray(streamConfig.dir);
+                  var sftpDirPath = exports.getFilePathArray(streamConfig.sftpLocation);
                   return exports.getSftpConfig(streamConfig)
                   .then(function(sftpConfig) {
                     return sftpHelper.withSftpClient(sftpConfig, function(sftp) {

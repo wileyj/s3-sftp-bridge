@@ -18,7 +18,7 @@ var AWS = require('aws-sdk'),
 describe('main', function() {
   var config = {
     "test-stream": {
-      "dir": "dir",
+      "sftpLocation": "dir",
       "sftpConfig": sftpConfig.sftpConfig,
       "s3Location": "my-bucket"
     }

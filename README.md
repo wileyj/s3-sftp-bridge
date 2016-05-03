@@ -32,7 +32,8 @@ The configuration is a map of streamName to configuration for that stream:
       "port": 2222,
       "s3PrivateKey": "another-bucket-name/path/to/private_key",
       "username": "user"
-    }
+    },
+    "sftpLocation": "my-directory"
   },
   "stream2": {
     "s3Location": "your-other-bucket-name/destination/directory",
@@ -40,12 +41,13 @@ The configuration is a map of streamName to configuration for that stream:
       "host": "hostname",
       "username": "user",
       "password": "pwd"
-    }
+    },
+    "sftpLocation": "my-directory"
   }
 }
 ```
 
-### dir
+### sftpLocation
 The directory (can be nested) on the SFTP side to either a) look for new files to copy to S3 or b) drop into when
 copying from S3.
 
